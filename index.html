@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ElectroHub - Smart EV Station & Load Management System</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+              900: '#064e3b',
+              950: '#022c22'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="bg-[#090d16] text-slate-100 min-h-screen flex flex-col antialiased selection:bg-emerald-500 selection:text-slate-950">
+
+  <!-- ================= TOP NAVIGATION BAR ================= -->
+  <header class="sticky top-0 z-40 bg-[#090d16]/90 backdrop-blur-md border-b border-slate-800/80 px-4 lg:px-8 py-3">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+      
+      <!-- Brand & Station Switcher -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-400 p-0.5 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <div class="w-full h-full bg-[#090d16] rounded-[10px] flex items-center justify-center">
+            <i data-lucide="zap" class="w-5 h-5 text-emerald-400"></i>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-extrabold tracking-tight text-white flex items-center gap-1.5">
+              Electro<span class="text-emerald-400">Hub</span>
+            </h1>
+            <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              Live DLB 2.4
+            </span>
+          </div>
+          <div class="flex items-center gap-2 mt-0.5">
+            <span id="stationStatusDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <select id="stationSelect" class="bg-transparent text-xs font-medium text-slate-400 hover:text-slate-200 cursor-pointer focus:outline-none pr-4">
+              <option value="S01" class="bg-slate-900 text-slate-200">City Mall Parking Hub (S01 - 60kW)</option>
+              <option value="S02" class="bg-slate-900 text-slate-200">Highway Supercharge (S02 - 120kW)</option>
+              <option value="S03" class="bg-slate-900 text-slate-200">CyberTech Solar Park (S03 - 90kW)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center Role Switcher (Experiments 05, 06 Actors) -->
+      <div class="flex items-center justify-center">
+        <div class="inline-flex p-1 rounded-xl bg-slate-900/90 border border-slate-800 text-xs font-semibold">
+          <button data-role="MANAGER" class="role-pill px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+            <i data-lucide="shield" class="w-3.5 h-3.5"></i> Station Operator
+          </button>
+          <button data-role="USER" class="role-pill px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-slate-400 border border-transparent hover:text-slate-200">
+            <i data-lucide="user" class="w-3.5 h-3.5"></i> EV User Portal
+          </button>
+          <button data-role="GRID" class="role-pill px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-slate-400 border border-transparent hover:text-slate-200">
+            <i data-lucide="activity" class="w-3.5 h-3.5"></i> Load & Grid Manager
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Utility Controls -->
+      <div class="flex items-center gap-2 justify-end">
+        <!-- Audio Synthesizer toggle -->
+        <button id="soundToggleBtn" data-tooltip="Audio Chimes" class="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-emerald-400 border border-slate-800 transition-all">
+          <i id="soundIcon" data-lucide="volume-2" class="w-4 h-4"></i>
+        </button>
+
+        <!-- UML / Architecture Modal Toggle -->
+        <button id="btnOpenUMLModal" class="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-emerald-500/30 text-xs font-medium transition-all flex items-center gap-1.5">
+          <i data-lucide="layers" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span class="hidden sm:inline">SRS & Architecture</span>
+        </button>
+
+        <!-- New Request Button -->
+        <button id="btnOpenBookingModal" class="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-500/20">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span>New EV Request</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ================= SUB-BAR: LIVE SIMULATION CONTROLS (LOVABLE STYLE) ================= -->
+  <section class="bg-slate-950/70 border-b border-slate-800/60 px-4 lg:px-8 py-2.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
+      
+      <!-- Simulation playback & speed -->
+      <div class="flex items-center gap-2">
+        <span class="text-slate-400 flex items-center gap-1">
+          <i data-lucide="cpu" class="w-3.5 h-3.5 text-cyan-400"></i> Simulator:
+        </span>
+        <button id="simPlayPauseBtn" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium flex items-center gap-1 transition-all">
+          <i id="playPauseIcon" data-lucide="pause" class="w-3 h-3"></i>
+          <span id="playPauseText">Pause</span>
+        </button>
+        <div class="inline-flex rounded bg-slate-900 border border-slate-800 p-0.5">
+          <button data-speed="1" class="sim-speed-btn px-2 py-0.5 rounded font-bold bg-emerald-500 text-slate-950">1x</button>
+          <button data-speed="3" class="sim-speed-btn px-2 py-0.5 rounded text-slate-400 hover:text-white">3x</button>
+          <button data-speed="5" class="sim-speed-btn px-2 py-0.5 rounded text-slate-400 hover:text-white">5x</button>
+        </div>
+      </div>
+
+      <!-- Interactive trigger buttons -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <button id="btnSimulateArrival" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-emerald-500/40 text-slate-200 transition-all flex items-center gap-1.5 font-medium">
+          <i data-lucide="car" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Spawn Random EV</span>
+        </button>
+
+        <button id="btnSimulateOverload" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-rose-950/40 border border-slate-700 hover:border-rose-500/50 text-slate-200 hover:text-rose-300 transition-all flex items-center gap-1.5 font-medium">
+          <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-rose-400"></i>
+          <span>Simulate Grid Throttle (Drop Capacity)</span>
+        </button>
+
+        <div class="h-4 w-px bg-slate-800 hidden sm:block"></div>
+
+        <button id="btnExportCSV" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition-all flex items-center gap-1">
+          <i data-lucide="download" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Export CSV</span>
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= MAIN DASHBOARD CONTAINER ================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6 space-y-6">
+
+    <!-- STATION MANAGER CONTROLS (Default Role View) -->
+    <div id="stationManagerControls" class="space-y-6">
+      
+      <!-- 4 KPI Stat Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Card 1: Active Load vs Capacity (FR-03, FR-04) -->
+        <div class="glass-panel p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between text-slate-400 text-xs">
+            <span class="font-semibold uppercase tracking-wider">Station Load Demand</span>
+            <i data-lucide="zap" class="w-4 h-4 text-emerald-400"></i>
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span id="kpiCurrentLoad" class="text-2xl font-black text-white mono">40.0 kW</span>
+            <span id="kpiLoadLimit" class="text-xs text-slate-400 mono">/ 60 kW</span>
+          </div>
+          <div class="mt-3">
+            <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+              <div id="kpiLoadBar" class="h-2 rounded-full bg-emerald-400 transition-all duration-500" style="width: 66%"></div>
+            </div>
+            <div class="mt-1.5 flex justify-between text-[11px] text-slate-400">
+              <span id="kpiLoadPercent">66% capacity</span>
+              <span class="text-emerald-400 font-medium">Safe Margin</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Bay Availability (FR-01) -->
+        <div class="glass-panel p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between text-slate-400 text-xs">
+            <span class="font-semibold uppercase tracking-wider">Charging Points</span>
+            <i data-lucide="cpu" class="w-4 h-4 text-cyan-400"></i>
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span id="kpiBayOccupancy" class="text-2xl font-black text-white mono">2 / 6</span>
+            <span class="text-xs text-emerald-400 font-semibold">Active</span>
+          </div>
+          <div class="mt-3 flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800">
+            <span id="kpiBaySubtext">4 bays available</span>
+            <span class="flex items-center gap-1 text-slate-300"><span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> 100% Online</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Energy Delivered Today (FR-08) -->
+        <div class="glass-panel p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between text-slate-400 text-xs">
+            <span class="font-semibold uppercase tracking-wider">Total Energy Delivered</span>
+            <i data-lucide="battery-charging" class="w-4 h-4 text-amber-400"></i>
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span id="kpiTotalEnergy" class="text-2xl font-black text-white mono">428.5 kWh</span>
+          </div>
+          <div class="mt-3 flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800">
+            <span class="text-emerald-400 font-medium flex items-center gap-0.5"><i data-lucide="trending-up" class="w-3 h-3"></i> +14.8% vs yesterday</span>
+            <span>Today</span>
+          </div>
+        </div>
+
+        <!-- Card 4: Station Revenue & Grid Stability -->
+        <div class="glass-panel p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between text-slate-400 text-xs">
+            <span class="font-semibold uppercase tracking-wider">Est. Revenue & Health</span>
+            <i data-lucide="circle-dollar-sign" class="w-4 h-4 text-emerald-400"></i>
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span id="kpiTotalRevenue" class="text-2xl font-black text-white mono">₹5,356</span>
+            <span class="text-xs text-slate-400">@ ₹12.5/kWh</span>
+          </div>
+          <div class="mt-3 flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800">
+            <span class="text-cyan-400 font-medium">PF 0.98 (Optimal)</span>
+            <span>Grid: 50.0 Hz</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- MAIN CONTENT SPLIT: Left = Charging Bays & Chart; Right = Load Balancer & Alerts -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left 2 Cols: Charging Bays Grid & Real-time Power Chart -->
+        <div class="lg:col-span-2 space-y-6">
+          
+          <!-- Charging Bays Section (FR-01, FR-06) -->
+          <div class="glass-panel p-6">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h2 class="text-base font-bold text-white flex items-center gap-2">
+                  <i data-lucide="layout-grid" class="w-4 h-4 text-emerald-400"></i>
+                  <span>Charging Points Matrix —</span>
+                  <span id="stationNameDisplay" class="text-emerald-400 font-bold">City Mall Parking Hub</span>
+                </h2>
+                <p class="text-xs text-slate-400 mt-0.5" id="stationLocationDisplay">
+                  City Mall Basement B2 • Real-time Hardware Telemetry
+                </p>
+              </div>
+              <button onclick="window.dashboard.spawnRandomEV()" class="text-xs font-medium text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
+                <i data-lucide="refresh-cw" class="w-3 h-3"></i> Auto Connect
+              </button>
+            </div>
+
+            <!-- Dynamic Bay Cards Container -->
+            <div id="chargingBaysGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Rendered via app.js -->
+            </div>
+          </div>
+
+          <!-- Real-Time Load & Capacity Timeline (Chart.js) -->
+          <div class="glass-panel p-6">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                  <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i>
+                  Real-Time Load Demand vs Configured Capacity
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">Live 1-second telemetry stream (FR-03 & FR-04 Dynamic Allocation)</p>
+              </div>
+              <span class="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+                Live Stream
+              </span>
+            </div>
+            <div class="h-64 w-full">
+              <canvas id="loadChart"></canvas>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right 1 Col: Dynamic Load Balancer & Alerts Feed -->
+        <div class="space-y-6">
+          
+          <!-- Smart Load Management Panel (Experiment 01, 03, 07) -->
+          <div class="glass-panel p-5">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="sliders" class="w-4 h-4 text-amber-400"></i>
+                Load Management Module
+              </h3>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold">
+                FR-04 / FR-05
+              </span>
+            </div>
+
+            <!-- Capacity Slider -->
+            <div class="space-y-3">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-slate-300 font-medium">Configured Power Limit</span>
+                <span id="sliderLimitDisplay" class="font-bold text-emerald-400 mono text-sm">60 kW</span>
+              </div>
+              <input id="powerLimitSlider" type="range" min="15" max="80" value="60" class="w-full cursor-pointer accent-emerald-500" />
+              <div class="flex justify-between text-[10px] text-slate-500">
+                <span>15 kW (Curtailment)</span>
+                <span>80 kW (Max Grid)</span>
+              </div>
+            </div>
+
+            <!-- Strategy Selector -->
+            <div class="mt-4 pt-4 border-t border-slate-800 space-y-2">
+              <label class="text-xs text-slate-300 font-medium block">Load Balancing Strategy</label>
+              <select id="strategySelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs p-2 text-slate-200 focus:outline-none focus:border-emerald-500">
+                <option value="EQUAL_SHARE">Dynamic Equal Share (Distribute equally)</option>
+                <option value="PRIORITY">Priority & Low SOC Boost (VIP first)</option>
+                <option value="FCFS">First-Come, First-Served (FCFS)</option>
+              </select>
+              <p class="text-[11px] text-slate-400 leading-relaxed mt-1">
+                When demand approaches limit, power is automatically reallocated without tripping transformer.
+              </p>
+            </div>
+          </div>
+
+          <!-- Waiting Queue for Scheduling (FR-05) -->
+          <div class="glass-panel p-5">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="clock" class="w-4 h-4 text-cyan-400"></i>
+                Scheduled & Queued Requests
+              </h3>
+              <span id="queueCountBadge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+                0
+              </span>
+            </div>
+            <div id="queueList" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+              <!-- Rendered via app.js -->
+            </div>
+          </div>
+
+          <!-- Real-Time Alerts Feed (FR-07, Alert Manager) -->
+          <div class="glass-panel p-5">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+              <div class="flex items-center gap-2">
+                <i data-lucide="bell" class="w-4 h-4 text-rose-400"></i>
+                <h3 class="text-sm font-bold text-white">System Alerts & Logs</h3>
+              </div>
+              <span id="alertCountBadge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                0
+              </span>
+            </div>
+            <div id="alertsFeed" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+              <!-- Rendered via app.js -->
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- HISTORICAL SESSION RECORDS TABLE (FR-08) -->
+      <div class="glass-panel p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-400"></i>
+              Charging Sessions & Energy Usage Log
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">Compliant with SRS FR-08 (Records of charging sessions and energy usage)</p>
+          </div>
+          <button onclick="window.dashboard.exportSessionsCSV()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all self-start sm:self-auto">
+            <i data-lucide="download" class="w-3.5 h-3.5 text-cyan-400"></i> Download CSV Report
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                <th class="p-3">Session ID</th>
+                <th class="p-3">User & Vehicle</th>
+                <th class="p-3">Bay</th>
+                <th class="p-3">Start Time</th>
+                <th class="p-3">Energy (kWh)</th>
+                <th class="p-3">Peak Power</th>
+                <th class="p-3">Total Cost</th>
+                <th class="p-3">Status</th>
+              </tr>
+            </thead>
+            <tbody id="sessionsTableBody" class="divide-y divide-slate-800/40">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- EV USER PORTAL CONTAINER (Switched via role button) -->
+    <div id="evUserPanel" class="hidden">
+      <div id="userPortalContent"></div>
+    </div>
+
+    <!-- GRID & LOAD MANAGER DEEP INSPECT PANEL -->
+    <div id="gridManagerPanel" class="hidden space-y-6">
+      <div class="glass-panel p-6">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2 mb-2">
+          <i data-lucide="gauge" class="w-5 h-5 text-cyan-400"></i>
+          Grid Utility & Transformer Telemetry (Experiment 03 Context DFD)
+        </h2>
+        <p class="text-xs text-slate-400 mb-6">
+          High-voltage feeder line monitoring, phase balance analysis, and power factor correction.
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+            <span class="text-xs text-slate-400">Feeder Bus Voltage</span>
+            <div class="text-2xl font-bold text-emerald-400 mono mt-1">415.2 V AC</div>
+            <p class="text-[11px] text-slate-500 mt-1">3-Phase 50 Hz ± 0.05 Hz</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+            <span class="text-xs text-slate-400">Substation Transformer Margin</span>
+            <div class="text-2xl font-bold text-cyan-400 mono mt-1">33.3% Headroom</div>
+            <p class="text-[11px] text-slate-500 mt-1">Thermal rating nominal at 42°C</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+            <span class="text-xs text-slate-400">Peak Load Curtailment Mode</span>
+            <div class="text-2xl font-bold text-amber-400 mono mt-1">Standby</div>
+            <p class="text-[11px] text-slate-500 mt-1">Auto-shedding active if load > 95%</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ================= BOOKING & CHARGE REQUEST MODAL (FR-02) ================= -->
+  <div id="bookingModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm hidden animate-fade-in">
+    <div class="glass-panel w-full max-w-md p-6 border border-slate-700 animate-scale-up relative">
+      <button id="btnCloseBookingModal" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex items-center gap-2 mb-4">
+        <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+          <i data-lucide="battery-charging" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white">Create Charging Request</h3>
+          <p class="text-xs text-slate-400">Software Specification FR-02 & FR-04</p>
+        </div>
+      </div>
+
+      <form id="bookingForm" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Select EV User Profile</label>
+          <select id="modalUserSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs p-2.5 text-slate-200 focus:outline-none focus:border-emerald-500">
+            <!-- Populated via app.js -->
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Requested Power (kW)</label>
+            <input id="modalPowerInput" type="number" min="7" max="60" value="22" required class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs p-2.5 text-slate-200 focus:outline-none focus:border-emerald-500 mono" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Target Battery SOC (%)</label>
+            <input id="modalTargetSOC" type="number" min="50" max="100" value="85" required class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs p-2.5 text-slate-200 focus:outline-none focus:border-emerald-500 mono" />
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 pt-2">
+          <input type="checkbox" id="modalPriorityCheck" class="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0" />
+          <label for="modalPriorityCheck" class="text-xs text-slate-300">VIP / Emergency Priority (High Allocation)</label>
+        </div>
+
+        <div class="pt-3 border-t border-slate-800 flex justify-end gap-2">
+          <button type="button" onclick="document.getElementById('bookingModal').classList.add('hidden')" class="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-2 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20">
+            Submit Request
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= SRS & ARCHITECTURE MAPPING MODAL ================= -->
+  <div id="umlModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden animate-fade-in">
+    <div class="glass-panel w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 border border-slate-700 animate-scale-up relative">
+      <button id="btnCloseUMLModal" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex items-center gap-2.5 mb-5 border-b border-slate-800 pb-4">
+        <div class="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+          <i data-lucide="git-merge" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h2 class="text-base font-bold text-white">System Architecture & SRS Traceability Matrix</h2>
+          <p class="text-xs text-slate-400">Direct compliance mapping to Experiments 01 through 10</p>
+        </div>
+      </div>
+
+      <div class="space-y-5 text-xs text-slate-300">
+        
+        <!-- SRS Requirements Checklist -->
+        <div class="p-4 rounded-xl bg-slate-900/70 border border-slate-800">
+          <h4 class="font-bold text-slate-100 mb-2 flex items-center gap-1.5 text-emerald-400">
+            <i data-lucide="check-circle" class="w-4 h-4"></i> Experiment-02: SRS Functional Requirements (FR) Status
+          </h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+            <div class="flex items-center gap-2 p-2 rounded bg-slate-950/50 border border-slate-800/80">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span><strong>FR-01:</strong> Bay availability matrix & status</span>
+            </div>
+            <div class="flex items-center gap-2 p-2 rounded bg-slate-950/50 border border-slate-800/80">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span><strong>FR-02:</strong> Accept & record vehicle requests</span>
+            </div>
+            <div class="flex items-center gap-2 p-2 rounded bg-slate-950/50 border border-slate-800/80">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span><strong>FR-03:</strong> Monitor total station capacity</span>
+            </div>
+            <div class="flex items-center gap-2 p-2 rounded bg-slate-950/50 border border-slate-800/80">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span><strong>FR-04:</strong> Dynamic load allocation under limit</span>
+            </div>
+            <div class="flex items-center gap-2 p-2 rounded bg-slate-950/50 border border-slate-800/80">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span><strong>FR-05:</strong> Schedule/queue when demand exceeds limit</span>
+            </div>
+            <div class="flex items-center gap-2 p-2 rounded bg-slate-950/50 border border-slate-800/80">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span><strong>FR-06:</strong> Real-time consumption & SOC display</span>
+            </div>
+            <div class="flex items-center gap-2 p-2 rounded bg-slate-950/50 border border-slate-800/80">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span><strong>FR-07:</strong> Operator notifications & overload alerts</span>
+            </div>
+            <div class="flex items-center gap-2 p-2 rounded bg-slate-950/50 border border-slate-800/80">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span><strong>FR-08:</strong> Historical session & energy CSV logs</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- UML Models Mapping -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800">
+            <h5 class="font-bold text-cyan-400 mb-1">Experiment 03 & 04 (DFD & ERD)</h5>
+            <p class="text-slate-400 leading-relaxed">
+              Implemented entities: <code class="text-emerald-300">EVUser</code>, <code class="text-emerald-300">ChargingRequest</code>, <code class="text-emerald-300">Station</code>, <code class="text-emerald-300">ScheduleAllocation</code>, <code class="text-emerald-300">ChargingSession</code>, and <code class="text-emerald-300">Alert</code>.
+            </p>
+          </div>
+          <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800">
+            <h5 class="font-bold text-amber-400 mb-1">Experiment 07 (State Machine)</h5>
+            <p class="text-slate-400 leading-relaxed">
+              Life-cycle flow: <span class="text-slate-200">SUBMITTED &rarr; UNDER_VALIDATION &rarr; [Approved/Queued] &rarr; CHARGING &rarr; COMPLETED/CANCELLED</span>.
+            </p>
+          </div>
+        </div>
+
+        <!-- Preloaded Object Diagram Instances -->
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800">
+          <h5 class="font-bold text-slate-200 mb-1">Experiment 06 Object Diagram Instances</h5>
+          <ul class="list-disc list-inside text-slate-400 space-y-0.5 mt-1">
+            <li><strong>ev1: EVUser:</strong> Aarav Sharma (U101), Tata Nexon EV</li>
+            <li><strong>ev2: EVUser:</strong> Neha Verma (U102), MG ZS EV</li>
+            <li><strong>stn1: Station:</strong> City Mall Parking (S01, 60 kW Max Capacity)</li>
+            <li><strong>cp1: ChargingPoint:</strong> P01 (22 kW Rated Fast Charger)</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Unified Application Bundle (Zero-config instant run via file:// or http://) -->
+  <script src="js/bundle.js"></script>
+
+  <script>
+    // Initialize Lucide icons on start
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    });
+  </script>
+</body>
+</html>
